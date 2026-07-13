@@ -29,11 +29,14 @@ internal data class PlaylistFile(
 
 internal sealed interface SongPointer {
     data class UID(val uid: Music.UID) : SongPointer
-    //    data class Path(val options: List<Path>) : SongPointer
+
+    data class Path(val options: List<org.oxycblt.musikr.fs.Path>) : SongPointer
 }
 
 internal interface PlaylistHandle {
     val uid: Music.UID
+
+    val updatedAt: Long
 
     suspend fun rename(name: String)
 
