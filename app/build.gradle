@@ -47,6 +47,9 @@ android {
         }
 
         release {
+            // Personal fork: distinct package so it installs alongside (and never
+            // collides with the signature of) upstream Auxio builds.
+            applicationIdSuffix ".fork"
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
