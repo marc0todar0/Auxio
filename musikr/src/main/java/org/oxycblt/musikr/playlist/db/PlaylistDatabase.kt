@@ -32,7 +32,6 @@ import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
-import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteQueryBuilder
 import org.oxycblt.musikr.Music
@@ -54,9 +53,7 @@ internal abstract class PlaylistDatabase : RoomDatabase() {
     companion object {
         private fun washUids(db: SupportSQLiteDatabase, table: String, column: String) {
             val playlistUidMigration =
-                db.query(
-                        SupportSQLiteQueryBuilder.builder(table).columns(arrayOf(column)).create()
-                    )
+                db.query(SupportSQLiteQueryBuilder.builder(table).columns(arrayOf(column)).create())
                     .use {
                         val migrations = mutableListOf<Pair<String, String>>()
                         val playlistUidIndex = it.getColumnIndexOrThrow(column)
@@ -117,8 +114,8 @@ internal abstract class PlaylistDatabase : RoomDatabase() {
             }
 
         /**
-         * Fork: installs made before the upstream UID migration landed are on the fork-only
-         * version 31, which already has updatedAt but still needs the upstream UID rewrite.
+         * Fork: installs made before the upstream UID migration landed are on the fork-only version
+         * 31, which already has updatedAt but still needs the upstream UID rewrite.
          */
         private val MIGRATION_31_76 =
             object : Migration(31, 76) {

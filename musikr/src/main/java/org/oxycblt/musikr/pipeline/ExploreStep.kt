@@ -22,6 +22,7 @@ import android.content.Context
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import org.oxycblt.musikr.Config
 import org.oxycblt.musikr.Music
@@ -63,7 +64,9 @@ private class ExploreStepImpl(
         explored: Channel<Explored>,
     ): Deferred<Result<Unit>> {
         val files = Channel<File>(Channel.UNLIMITED)
-        val filesTask = fs.explore(files)
+        // FS implementations only return once the entire walk has finished, so run the walk
+        // as its own task to let the rest of the pipeline consume files as they are found.
+        val filesTask = scope.async(Dispatchers.IO) { fs.explore(files).await() }
 
         val storedPlaylists = storage.storedPlaylists.read()
 
