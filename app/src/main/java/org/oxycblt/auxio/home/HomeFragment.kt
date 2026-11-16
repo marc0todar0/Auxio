@@ -19,6 +19,8 @@
 package org.oxycblt.auxio.home
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.MenuItem
@@ -31,6 +33,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
@@ -38,6 +41,7 @@ import com.google.android.material.appbar.AppBarLayout
 import com.google.android.material.tabs.TabLayoutMediator
 import com.google.android.material.transition.MaterialSharedAxis
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import org.oxycblt.auxio.R
 import org.oxycblt.auxio.databinding.FragmentHomeBinding
 import org.oxycblt.auxio.detail.DetailViewModel
@@ -57,6 +61,7 @@ import org.oxycblt.auxio.music.MusicType
 import org.oxycblt.auxio.music.MusicViewModel
 import org.oxycblt.auxio.music.PlaylistDecision
 import org.oxycblt.auxio.music.PlaylistMessage
+import org.oxycblt.auxio.music.navisync.NaviSync
 import org.oxycblt.auxio.playback.PlaybackDecision
 import org.oxycblt.auxio.playback.PlaybackViewModel
 import org.oxycblt.auxio.ui.FadingToolbarOffsetListener
@@ -87,6 +92,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
     private var storagePermissionLauncher: ActivityResultLauncher<String>? = null
     private var getContentLauncher: ActivityResultLauncher<String>? = null
     private var pendingImportTarget: Playlist? = null
+    private var naviSyncLauncher: ActivityResultLauncher<Intent>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -120,6 +126,11 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
 
                 L.d("Received playlist URI $uri")
                 musicModel.importPlaylist(uri, pendingImportTarget)
+            }
+
+        naviSyncLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                requireContext().showToast(NaviSync.messageFor(result.resultCode))
             }
 
         // --- UI SETUP ---
@@ -178,7 +189,25 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
     override fun onDestroyBinding(binding: FragmentHomeBinding) {
         super.onDestroyBinding(binding)
         storagePermissionLauncher = null
+        naviSyncLauncher = null
         binding.homeNormalToolbar.setOnMenuItemClickListener(null)
+    }
+
+    private fun syncPlaylistsToNavidrome() {
+        val playlists = homeModel.playlistList.value
+        if (playlists.isEmpty()) {
+            requireContext().showToast(R.string.err_navisync_empty)
+            return
+        }
+        L.d("Handing ${playlists.size} playlists to NaviSync")
+        viewLifecycleOwner.lifecycleScope.launch {
+            val intent = NaviSync.createSyncIntent(requireContext(), playlists)
+            try {
+                naviSyncLauncher?.launch(intent)
+            } catch (e: ActivityNotFoundException) {
+                requireContext().showToast(R.string.err_navisync_missing)
+            }
+        }
     }
 
     override fun onMenuItemClick(item: MenuItem): Boolean {
@@ -201,6 +230,10 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
             R.id.action_about -> {
                 L.d("Navigating to about")
                 homeModel.showAbout()
+                true
+            }
+            R.id.action_sync_navidrome -> {
+                syncPlaylistsToNavidrome()
                 true
             }
 

@@ -110,6 +110,19 @@
             tools:ignore="ExportedContentProvider" />
 
         <!--
+        Fork: hands playlists to the NaviSync app through one-shot read grants (never exported).
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.navisync"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/navisync_paths" />
+        </provider>
+
+        <!--
         Work around apps that blindly query for ACTION_MEDIA_BUTTON working.
         See the class for more info.
         -->

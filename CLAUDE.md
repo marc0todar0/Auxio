@@ -14,6 +14,8 @@ When resolving conflicts with upstream, keep both sides: take upstream's changes
 - **Signing**: `./gradlew app:assembleRelease` produces an *unsigned* APK. Sign it with the fork keystore, which lives outside the repo at `~/.android/auxio-fork.jks` (alias `auxio-fork`, password in `~/.android/auxio-fork.pass`): `zipalign -p 4`, then `apksigner sign --ks … --ks-pass file:…`. Always use this key — a build signed with any other key cannot update the installed app.
 - **Room schema versions** (`PlaylistDatabase`): the fork adds its own columns, so its version must stay *above* upstream's, with a migration from upstream's version to the fork's. Devices already running an older fork build need a migration from their fork-only version too — otherwise `fallbackToDestructiveMigration` silently wipes the user's playlists.
 
+- **NaviSync bridge** (`music/navisync/NaviSync.kt`, "Sync playlists to Navidrome" in the home overflow menu): Auxio stays offline and only hands playlist names + song paths to the separate NaviSync app (`~/Developer/navisync`, `eu.todaro.navisync`), which uploads them to Navidrome. The JSON goes through a non-exported `FileProvider` (authority `${applicationId}.navisync`), launched with `startActivityForResult` because NaviSync checks the calling package against an allowlist — a new application id must be added to `ALLOWED_CALLERS` in NaviSync's `PlaylistPushActivity`.
+
 ## Modules
 
 The build has two Gradle modules plus a vendored ExoPlayer tree:

@@ -90,6 +90,7 @@
     <string name="lbl_import_playlist">Import playlist</string>
     <string name="lbl_export">Export</string>
     <string name="lbl_export_playlist">Export playlist</string>
+    <string name="lbl_sync_navidrome">Sync playlists to Navidrome</string>
     <string name="lbl_rename">Rename</string>
     <string name="lbl_rename_playlist">Rename playlist</string>
     <string name="lbl_delete">Delete</string>
@@ -201,6 +202,7 @@
     <string name="lng_playlist_imported">Playlist imported</string>
     <string name="lng_playlist_renamed">Playlist renamed</string>
     <string name="lng_playlist_exported">Playlist exported</string>
+    <string name="lng_navisync_started">Playlist sync started in NaviSync</string>
     <string name="lng_playlist_deleted">Playlist deleted</string>
     <string name="lng_playlist_added">Added to playlist</string>
     <string name="lng_supporters_promo">Donate to the project to get your name added here!</string>
@@ -349,6 +351,10 @@
     <string name="err_index_failed">Music loading failed</string>
     <string name="err_import_failed">Unable to import a playlist from this file</string>
     <string name="err_export_failed">Unable to export the playlist to this file</string>
+    <string name="err_navisync_missing">NaviSync is not installed, or is too old to sync playlists</string>
+    <string name="err_navisync_unconfigured">Set up the server in NaviSync first</string>
+    <string name="err_navisync_failed">NaviSync refused the playlists</string>
+    <string name="err_navisync_empty">No playlists to sync</string>
     <string name="err_share_too_large">This is too large to share</string>
     <string name="err_share_failed">Unable to share this</string>
     <string name="err_no_app">No app found that can handle this task</string>
