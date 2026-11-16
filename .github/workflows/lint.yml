@@ -23,6 +23,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
         cache: gradle
+    # The pinned media submodule resolves the NDK directory at configuration time, before
+    # the Android Gradle Plugin gets a chance to download it.
+    - name: Install NDK
+      run: echo y | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
     - name: Check formatting with spotless
