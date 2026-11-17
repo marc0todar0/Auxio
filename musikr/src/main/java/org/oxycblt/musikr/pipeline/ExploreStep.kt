@@ -19,6 +19,7 @@
 package org.oxycblt.musikr.pipeline
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +67,13 @@ private class ExploreStepImpl(
         val files = Channel<File>(Channel.UNLIMITED)
         // FS implementations only return once the entire walk has finished, so run the walk
         // as its own task to let the rest of the pipeline consume files as they are found.
-        val filesTask = scope.async(Dispatchers.IO) { fs.explore(files).await() }
+        val filesTask =
+            scope.async(Dispatchers.IO) {
+                val start = System.currentTimeMillis()
+                fs.explore(files).await().also {
+                    Log.d("Musikr", "Filesystem walk took ${System.currentTimeMillis() - start}ms")
+                }
+            }
 
         val storedPlaylists = storage.storedPlaylists.read()
 

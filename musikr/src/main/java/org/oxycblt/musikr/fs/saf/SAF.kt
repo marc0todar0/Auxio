@@ -22,9 +22,15 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore as AOSPMediaStore
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
+import android.webkit.MimeTypeMap
 import androidx.annotation.RequiresApi
+import java.io.File as JavaFile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -56,19 +62,143 @@ private constructor(
 ) : FS {
     override suspend fun explore(files: Channel<File>): Deferred<Result<Unit>> = coroutineScope {
         tryAsyncWith(files, Dispatchers.Main) {
+            val exclude = query.exclude.mapTo(mutableSetOf()) { it.path }
             query.source
                 .map { location ->
-                    exploreDirectoryImpl(
-                        location.uri,
-                        DocumentsContract.getTreeDocumentId(location.uri),
-                        location.path,
-                        null,
-                        query.exclude.mapTo(mutableSetOf()) { it.path },
-                        files,
-                    )
+                    val treeDocumentId = DocumentsContract.getTreeDocumentId(location.uri)
+                    val directRoot = resolveDirectRoot(location.uri, treeDocumentId)
+                    if (directRoot != null) {
+                        exploreDirectImpl(
+                            location.uri,
+                            treeDocumentId,
+                            directRoot,
+                            location.path,
+                            null,
+                            exclude,
+                            files,
+                        )
+                    } else {
+                        exploreDirectoryImpl(
+                            location.uri,
+                            treeDocumentId,
+                            location.path,
+                            null,
+                            exclude,
+                            files,
+                        )
+                    }
                 }
                 .tryAwaitAll()
         }
+    }
+
+    /**
+     * Find the real directory backing a document tree, if we are allowed to read it directly.
+     *
+     * Going through the documents provider costs a binder round-trip and a pile of provider-side
+     * work per directory. With all-files access the same tree can be walked with plain file calls,
+     * producing the exact same document URIs.
+     */
+    private fun resolveDirectRoot(rootUri: Uri, treeDocumentId: String): JavaFile? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+        if (rootUri.authority != EXTERNAL_STORAGE_AUTHORITY) return null
+        if (!Environment.isExternalStorageManager()) return null
+        val split = treeDocumentId.indexOf(':')
+        if (split < 0) return null
+        val rootId = treeDocumentId.substring(0, split)
+        val relative = treeDocumentId.substring(split + 1)
+        val base =
+            if (rootId == PRIMARY_ROOT_ID) {
+                Environment.getExternalStorageDirectory()
+            } else {
+                JavaFile("/storage/$rootId")
+            }
+        val directory = if (relative.isEmpty()) base else JavaFile(base, relative)
+        return directory.takeIf { it.isDirectory && it.canRead() }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun CoroutineScope.exploreDirectImpl(
+        rootUri: Uri,
+        documentId: String,
+        directory: JavaFile,
+        relativePath: Path,
+        parent: Deferred<Directory>?,
+        exclude: Set<Path>,
+        files: Channel<File>,
+    ): Deferred<Result<Unit>> =
+        tryAsync(Dispatchers.IO) {
+            val uri = DocumentsContract.buildChildDocumentsUriUsingTree(rootUri, documentId)
+            val directoryDeferred = CompletableDeferred<Directory>()
+            val recursive = mutableListOf<Deferred<Result<Unit>>>().takeIf { query.multithread }
+            val children = mutableListOf<File>()
+            for (name in directory.list().orEmpty()) {
+                if (!query.withHidden && name.startsWith(".")) {
+                    continue
+                }
+                val newPath = relativePath.file(name)
+                if (newPath in exclude) {
+                    continue
+                }
+                val child = JavaFile(directory, name)
+                val stat =
+                    try {
+                        Os.stat(child.path)
+                    } catch (e: ErrnoException) {
+                        continue
+                    }
+                // Mirrors how the external storage provider derives its document ids.
+                val childId =
+                    if (documentId.endsWith(":")) documentId + name else "$documentId/$name"
+                if (OsConstants.S_ISDIR(stat.st_mode)) {
+                    val subtask =
+                        exploreDirectImpl(
+                            rootUri,
+                            childId,
+                            child,
+                            newPath,
+                            directoryDeferred,
+                            exclude,
+                            files,
+                        )
+                    if (recursive != null) {
+                        recursive.add(subtask)
+                    } else {
+                        subtask.await()
+                    }
+                } else {
+                    val childUri = DocumentsContract.buildDocumentUriUsingTree(rootUri, childId)
+                    val file =
+                        File(
+                            uri = childUri,
+                            mimeType = documentMimeType(childId),
+                            path = newPath,
+                            size = stat.st_size,
+                            // Must match the provider's millisecond timestamps exactly, or
+                            // every cached song would be considered stale.
+                            modifiedMs =
+                                stat.st_mtim.tv_sec * 1000 + stat.st_mtim.tv_nsec / 1_000_000,
+                            parent = directoryDeferred,
+                            addedMs = JoinAddedMs(context, childUri),
+                        )
+                    children.add(file)
+                    files.send(file)
+                }
+            }
+            directoryDeferred.complete(Directory(uri, relativePath, parent, children))
+            recursive?.tryAwaitAll()
+        }
+
+    /** Same extension-based lookup the external storage provider uses for its documents. */
+    private fun documentMimeType(documentId: String): String {
+        val lastDot = documentId.lastIndexOf('.')
+        if (lastDot >= 0) {
+            val extension = documentId.substring(lastDot + 1).lowercase()
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)?.let {
+                return it
+            }
+        }
+        return "application/octet-stream"
     }
 
     override fun track(): Flow<FSUpdate> = callbackFlow {
@@ -209,6 +339,9 @@ private constructor(
 
     companion object {
         fun from(context: Context, query: Query) = SAF(context, context.contentResolverSafe, query)
+
+        private const val EXTERNAL_STORAGE_AUTHORITY = "com.android.externalstorage.documents"
+        private const val PRIMARY_ROOT_ID = "primary"
 
         private val PROJECTION =
             arrayOf(

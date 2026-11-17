@@ -20,10 +20,13 @@ package org.oxycblt.auxio.music.locations
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import android.view.LayoutInflater
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -125,6 +128,8 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
                 updateModeUI(binding)
                 updateSaveButtonState()
             }
+
+        binding.locationsDirectAccess.setOnClickListener { openAllFilesAccessSettings() }
 
         binding.locationsIncludeRecycler.apply {
             adapter = includeLocationAdapter
@@ -273,6 +278,36 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         // TODO
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The user may have just come back from the system all-files access screen.
+        binding?.let { updateDirectAccessState(it) }
+    }
+
+    private fun updateDirectAccessState(binding: DialogMusicLocationsBinding) {
+        binding.locationsDirectAccessSwitch.isChecked =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()
+    }
+
+    private fun openAllFilesAccessSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        val context = requireContext()
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:${context.packageName}"),
+                )
+            )
+        } catch (e: ActivityNotFoundException) {
+            try {
+                startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+            } catch (e: ActivityNotFoundException) {
+                L.w("No all files access settings screen: $e")
+            }
+        }
     }
 
     override fun onDestroyBinding(binding: DialogMusicLocationsBinding) {
@@ -490,6 +525,9 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
                 locationsImportPlaylistsTitle.isVisible = isExtrasExpanded
                 locationsImportPlaylistsDesc.isVisible = isExtrasExpanded
                 locationsImportPlaylists.isVisible = isExtrasExpanded
+
+                locationsDirectAccess.isVisible =
+                    isExtrasExpanded && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
             } else {
                 // System Database mode - show filter mode when expanded
                 // Hide include section
@@ -530,6 +568,8 @@ class LocationsDialog : ViewBindingMaterialDialogFragment<DialogMusicLocationsBi
                 locationsImportPlaylistsTitle.isVisible = false
                 locationsImportPlaylistsDesc.isVisible = false
                 locationsImportPlaylists.isVisible = false
+
+                locationsDirectAccess.isVisible = false
             }
         }
     }

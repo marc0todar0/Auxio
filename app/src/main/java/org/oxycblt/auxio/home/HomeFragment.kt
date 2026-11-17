@@ -343,9 +343,16 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
                     isInvisible = false
                     when (state.progress) {
                         is IndexingProgress.Songs -> {
-                            isIndeterminate = false
-                            progress = state.progress.loaded
-                            max = state.progress.explored
+                            if (state.progress.loaded == 0) {
+                                // Nothing has been loaded yet (the filesystem walk is still
+                                // warming up), so a determinate indicator would just sit
+                                // there empty. Spin until there is real progress to show.
+                                isIndeterminate = true
+                            } else {
+                                isIndeterminate = false
+                                max = state.progress.explored
+                                progress = state.progress.loaded
+                            }
                         }
                         is IndexingProgress.Indeterminate -> {
                             isIndeterminate = true
