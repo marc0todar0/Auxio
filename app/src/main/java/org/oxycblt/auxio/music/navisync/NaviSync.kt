@@ -40,6 +40,10 @@ import org.oxycblt.musikr.Playlist
 object NaviSync {
     private const val PACKAGE = "eu.todaro.navisync"
     private const val ACTIVITY = "$PACKAGE.push.PlaylistPushActivity"
+    private const val SYNC_ACTIVITY = "$PACKAGE.push.SyncRequestActivity"
+
+    /** Broadcast NaviSync sends once a download sync has finished changing local files. */
+    const val ACTION_SYNC_FINISHED = "eu.todaro.navisync.action.SYNC_FINISHED"
     private const val AUTHORITY = "${BuildConfig.APPLICATION_ID}.navisync"
 
     /** Mirrors PlaylistPushActivity.RESULT_NOT_CONFIGURED in NaviSync. */
@@ -84,11 +88,18 @@ object NaviSync {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
+    /**
+     * Create the [Intent] that makes NaviSync download the server's music into the local folder.
+     * Like [createSyncIntent] it must be launched for a result. NaviSync broadcasts
+     * [ACTION_SYNC_FINISHED] when done, which makes Auxio reload the library.
+     */
+    fun createDownloadIntent(): Intent = Intent().setClassName(PACKAGE, SYNC_ACTIVITY)
+
     /** The message to show the user for the result code NaviSync answered with. */
     @StringRes
-    fun messageFor(resultCode: Int) =
+    fun messageFor(resultCode: Int, @StringRes started: Int = R.string.lng_navisync_started) =
         when (resultCode) {
-            Activity.RESULT_OK -> R.string.lng_navisync_started
+            Activity.RESULT_OK -> started
             RESULT_NOT_CONFIGURED -> R.string.err_navisync_unconfigured
             else -> R.string.err_navisync_failed
         }

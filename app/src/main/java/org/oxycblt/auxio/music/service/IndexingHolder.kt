@@ -18,8 +18,12 @@
  
 package org.oxycblt.auxio.music.service
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.PowerManager
+import androidx.core.content.ContextCompat
 import coil3.ImageLoader
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +37,7 @@ import org.oxycblt.auxio.music.IndexingState
 import org.oxycblt.auxio.music.MusicRepository
 import org.oxycblt.auxio.music.MusicSettings
 import org.oxycblt.auxio.music.locations.LocationMode
+import org.oxycblt.auxio.music.navisync.NaviSync
 import org.oxycblt.auxio.playback.state.PlaybackStateManager
 import org.oxycblt.auxio.util.getSystemServiceCompat
 import org.oxycblt.musikr.MusicParent
@@ -86,7 +91,23 @@ private constructor(
             )
     private var trackingJob: Job? = null
 
+    // NaviSync tells us when a download sync changed the music folder. The broadcast carries no
+    // data, so the worst a spoofed one can do is trigger a (cached, cheap) rescan.
+    private val naviSyncReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                L.d("NaviSync finished a sync, reloading music")
+                requestIndex(true)
+            }
+        }
+
     fun attach() {
+        ContextCompat.registerReceiver(
+            workerContext,
+            naviSyncReceiver,
+            IntentFilter(NaviSync.ACTION_SYNC_FINISHED),
+            ContextCompat.RECEIVER_EXPORTED,
+        )
         musicSettings.registerListener(this)
         musicRepository.addUpdateListener(this)
         musicRepository.addIndexingListener(this)
@@ -95,6 +116,7 @@ private constructor(
     }
 
     fun release() {
+        workerContext.unregisterReceiver(naviSyncReceiver)
         stopTracking()
         musicRepository.unregisterWorker(this)
         musicRepository.removeIndexingListener(this)

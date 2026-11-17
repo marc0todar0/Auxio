@@ -20,6 +20,11 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_download_navidrome"
+        android:title="@string/lbl_download_navidrome"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_settings"
         android:title="@string/set_root_title"
         app:showAsAction="never" />

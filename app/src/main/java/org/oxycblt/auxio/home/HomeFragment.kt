@@ -93,6 +93,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
     private var getContentLauncher: ActivityResultLauncher<String>? = null
     private var pendingImportTarget: Playlist? = null
     private var naviSyncLauncher: ActivityResultLauncher<Intent>? = null
+    private var naviDownloadLauncher: ActivityResultLauncher<Intent>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,6 +132,17 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
         naviSyncLauncher =
             registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 requireContext().showToast(NaviSync.messageFor(result.resultCode))
+            }
+
+        naviDownloadLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                requireContext()
+                    .showToast(
+                        NaviSync.messageFor(
+                            result.resultCode,
+                            R.string.lng_navisync_download_started,
+                        )
+                    )
             }
 
         // --- UI SETUP ---
@@ -190,6 +202,7 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
         super.onDestroyBinding(binding)
         storagePermissionLauncher = null
         naviSyncLauncher = null
+        naviDownloadLauncher = null
         binding.homeNormalToolbar.setOnMenuItemClickListener(null)
     }
 
@@ -234,6 +247,14 @@ class HomeFragment : SelectionFragment<FragmentHomeBinding>() {
             }
             R.id.action_sync_navidrome -> {
                 syncPlaylistsToNavidrome()
+                true
+            }
+            R.id.action_download_navidrome -> {
+                try {
+                    naviDownloadLauncher?.launch(NaviSync.createDownloadIntent())
+                } catch (e: ActivityNotFoundException) {
+                    requireContext().showToast(R.string.err_navisync_missing)
+                }
                 true
             }
 
